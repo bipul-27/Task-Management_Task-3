@@ -14,25 +14,15 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 */
 
-// don't call the file directly
+
 if ( !defined( 'ABSPATH' ) ) exit;
 
-/**
- * Fluent_Features_board class
- * @class Fluent_Features_board The class that holds the entire Fluent_Features_board plugin
- */
+
 class Fluent_Features_board {
 
-    /**
-     * Plugin version
-     * @var string
-     */
+   
     public $version = '1.0.0';
 
-    /**
-     * Holds various class instances
-     * @var array
-     */
     private $container = array();
     public $columns = array();
 
@@ -42,11 +32,7 @@ class Fluent_Features_board {
     public $ffr_comments = 'ffr_comments';
     public $ffr_votes = 'ffr_votes';
 
-    /**
-     * Constructor for the Fluent_Features_board class
-     * Sets up all the appropriate hooks and actions
-     * within our plugin.
-     */
+   
     public function __construct() {
 
         $this->define_constants();
@@ -65,12 +51,7 @@ class Fluent_Features_board {
         add_action( 'wp_ajax_nopriv_fluent_features_board_ajaxregister', [$this, 'fluent_features_board_ajaxregister'] );
     }
 
-    /**
-     * Initializes the Fluent_Features_board() class
-     *
-     * Checks for an existing Fluent_Features_board() instance
-     * and if it doesn't find one, creates it.
-     */
+   
     public static function init() {
         static $instance = false;
 
@@ -81,13 +62,7 @@ class Fluent_Features_board {
         return $instance;
     }
 
-    /**
-     * Magic getter to bypass referencing plugin.
-     *
-     * @param $prop
-     *
-     * @return mixed
-     */
+    
     public function __get( $prop ) {
         if ( array_key_exists( $prop, $this->container ) ) {
             return $this->container[ $prop ];
@@ -96,22 +71,12 @@ class Fluent_Features_board {
         return $this->{$prop};
     }
 
-    /**
-     *
-     *
-     * @param $prop
-     *
-     * @return mixed
-     */
+    
     public function __isset( $prop ) {
         return isset( $this->{$prop} ) || isset( $this->container[ $prop ] );
     }
 
-    /**
-     * Define the constants
-     *
-     * @return void
-     */
+    
     public function define_constants() {
         define( 'FFB_VERSION', $this->version );
         define( 'FFB_FILE', __FILE__ );
@@ -121,41 +86,85 @@ class Fluent_Features_board {
         define( 'FFB_ASSETS', FFB_URL . '/assets' );
     }
 
-    /**
-     * Load the plugin after all plugins are loaded
-     *
-     * @return void
-     */
+    
     public function init_plugin() {
         $this->includes();
         $this->init_hooks();
         $this->ffb_wpdb_tables();
     }
     public function fluent_features_board_ajaxlogin() {
-        // First check the nonce, if it fails the function will break
+       
         check_ajax_referer( 'ajax-login-nonce', 'security' );
 
-        // Nonce is checked, get the POST data and sign user on
-        // Call auth_user_login
+        
         $this->ffb_auth_user_login($_POST['username'], $_POST['password'], 'Login');
 
         die();
+    }
+
+    public function ffb_frontend_scripts() {
+        wp_enqueue_style( 'fluent-features-board-global-frontend', FFB_ASSETS .'/css/fluent-features-board.frontend.css' );
+        wp_enqueue_script( 'ff-request-frontend', FFB_ASSETS .'/js/ff-request-frontend.js', ['jquery'], true );
+        wp_localize_script( 'ff-request-frontend', 'ajax_url', array(
+            'ajaxurl'         => admin_url('admin-ajax.php'),
+            'redirecturl'     => home_url(),
+            'loadingmessage'  => esc_html__('Sending user info, please wait...','fluent-features-board'),
+            'nonce'           => wp_create_nonce('ajax-nonce')
+        ));
+    }
+
+    public function ffb_auth_user_login($user_login, $password, $login) {
+		$info                  = array();
+		$info['user_login']    = $user_login;
+		$info['user_password'] = $password;
+
+
+		$user_signon = wp_signon( $info, is_ssl() ? true : false);
+		if ( is_wp_error($user_signon) ){
+			echo json_encode(
+                array(
+                    'loggedin' => false,
+                    'message'  => esc_html__('Wrong username or password.','fluent-features-board')
+                )
+            );
+		} else {
+			wp_set_current_user($user_signon->ID);
+			if($login=="Login"){
+				echo json_encode(
+                    array(
+                        'loggedin' => true,
+                        'message'  => esc_html__('Login successful, redirecting...','fluent-features-board')
+                    )
+                );
+			}
+			else{
+				echo json_encode(
+                    array(
+                        'loggedin' => true,
+                        'message'  => esc_html__('Registration successful, redirecting...','fluent-features-board')
+                    )
+                );
+			}
+
+		}
+
+		die();
     }
 
 
     public function fluent_features_board_ajaxregister() {
         global $options; $options = get_option('ffb_register_login');
 
-		// First check the nonce, if it fails the function will break
+		
 		check_ajax_referer( 'ajax-register-nonce', 'security' );
 
-		// Nonce is checked, get the POST data and sign user on
+		
 		$info = array();
 		$info['user_nicename'] = $info['nickname'] = $info['display_name'] = $info['first_name'] = $info['user_login'] = sanitize_user($_POST['username']) ;
 		$info['user_pass']     = sanitize_text_field($_POST['password']);
 		$info['user_email']    = sanitize_email( $_POST['email']);
 
-		// Register the user
+		
 
 		if(!is_email($info['user_email']) ){
 			echo json_encode(
@@ -217,68 +226,19 @@ class Fluent_Features_board {
 		die();
     }
 
-    public function ffb_auth_user_login($user_login, $password, $login) {
-		$info                  = array();
-		$info['user_login']    = $user_login;
-		$info['user_password'] = $password;
-
-
-		$user_signon = wp_signon( $info, is_ssl() ? true : false);
-		if ( is_wp_error($user_signon) ){
-			echo json_encode(
-                array(
-                    'loggedin' => false,
-                    'message'  => esc_html__('Wrong username or password.','fluent-features-board')
-                )
-            );
-		} else {
-			wp_set_current_user($user_signon->ID);
-			if($login=="Login"){
-				echo json_encode(
-                    array(
-                        'loggedin' => true,
-                        'message'  => esc_html__('Login successful, redirecting...','fluent-features-board')
-                    )
-                );
-			}
-			else{
-				echo json_encode(
-                    array(
-                        'loggedin' => true,
-                        'message'  => esc_html__('Registration successful, redirecting...','fluent-features-board')
-                    )
-                );
-			}
-
-		}
-
-		die();
-    }
+    
 
     public function ffb_loggedin_cookie( $logged_in_cookie ){
         $_COOKIE[LOGGED_IN_COOKIE] = $logged_in_cookie;
     }
 
-    public function ffb_frontend_scripts() {
-        wp_enqueue_style( 'fluent-features-board-global-frontend', FFB_ASSETS .'/css/fluent-features-board.frontend.css' );
-        wp_enqueue_script( 'ff-request-frontend', FFB_ASSETS .'/js/ff-request-frontend.js', ['jquery'], true );
-        wp_localize_script( 'ff-request-frontend', 'ajax_url', array(
-            'ajaxurl'         => admin_url('admin-ajax.php'),
-            'redirecturl'     => home_url(),
-            'loadingmessage'  => esc_html__('Sending user info, please wait...','fluent-features-board'),
-            'nonce'           => wp_create_nonce('ajax-nonce')
-        ));
-    }
+    
 
     public function ffb_admin_scripts() {
         wp_enqueue_style( 'fluent-features-board-admin', FFB_ASSETS .'/css/fluent-features-board.admin.css' );
     }
 
-    /**
-     * Placeholder for activation function
-     *
-     * Nothing being called here yet.
-     */
+    
     public function activate() {
 
         $installed = get_option( 'fluent_features_board_installed' );
@@ -290,41 +250,26 @@ class Fluent_Features_board {
         update_option( 'FFB_version', FFB_VERSION );
     }
 
-    /**
-     * Placeholder for deactivation function
-     *
-     * Nothing being called here yet.
-     */
     
-
-    /**
-     * Include the required files
-     *
-     * @return void
-     */
     public function includes() {
 
         require_once FFB_INCLUDES . '/database/model-table.php';
         require_once FFB_INCLUDES . '/Assets.php';
         require_once FFB_INCLUDES . '/Shortcodes.php';
 
-        // if ( $this->is_request( 'admin' ) ) {
+        
             require_once FFB_INCLUDES . '/Admin.php';
-        // }
+        
 
         if ( $this->is_request( 'ajax' ) ) {}
     }
 
-    /**
-     * Initialize the hooks
-     *
-     * @return void
-     */
+   
     public function init_hooks() {
 
         add_action( 'init', array( $this, 'init_classes' ) );
 
-        // Localize our plugin
+        
         add_action( 'init', array( $this, 'localization_setup' ) );
     }
 
@@ -346,7 +291,7 @@ class Fluent_Features_board {
         ) $charset_collate;";
 
 
-        // Tables
+        
         $ffr_table_name = $wpdb->prefix . $this->ff_requests_list;
 
         $sql2 = "CREATE TABLE $ffr_table_name (
@@ -363,7 +308,7 @@ class Fluent_Features_board {
         ) $charset_collate;";
 
 
-        // Tables
+        
         $ffr_tags_table = $wpdb->prefix . $this->ffr_tags;
 
         $sql3 = "CREATE TABLE $ffr_tags_table (
@@ -375,7 +320,7 @@ class Fluent_Features_board {
         ) $charset_collate;";
 
 
-        // Tables
+        
         $ffr_comments_table = $wpdb->prefix . $this->ffr_comments;
 
         $sql4 = "CREATE TABLE $ffr_comments_table (
@@ -392,7 +337,7 @@ class Fluent_Features_board {
         ) $charset_collate;";
 
 
-        // Tables
+        
         $ffr_votes_table = $wpdb->prefix . $this->ffr_votes;
 
         $sql5 = "CREATE TABLE $ffr_votes_table (
@@ -428,36 +373,28 @@ class Fluent_Features_board {
 
     }
 
-    /**
-     * Instantiate the required classes
-     *
-     * @return void
-     */
+    
     public function init_classes() {
 
-        // Model Table
+        
         $this->container['model_table'] = new FFB\FFB_Model_Table();
 
-        // Admin
+        
         if ( $this->is_request( 'admin' ) ) {
             $this->container['admin'] = new FFB\FFB_Admin();
         }
 
-        // Ajax
+        
         if ( $this->is_request( 'ajax' ) ) {}
 
-        // Assets
+        
         $this->container['assets'] = new FFB\FFB_Assets();
 
-        // Shortcodes
+        
         $this->container['hooks'] = new FFB\Shortcodes();
     }
 
-    /**
-     * Initialize plugin for localization
-     *
-     * @uses load_plugin_textdomain()
-     */
+    
     public function localization_setup() {
         load_plugin_textdomain( 'fluent-features-board', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
     }
@@ -478,6 +415,6 @@ class Fluent_Features_board {
         }
     }
 
-} // Fluent_Features_board
+} 
 
 $fluent_features_board = Fluent_Features_board::init();
